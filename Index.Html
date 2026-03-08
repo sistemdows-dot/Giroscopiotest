@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Sniper Giroscopio Completo con Físicas y Controles</title>
+<style>
+body{
+    font-family:Arial;
+    background:#111;
+    color:white;
+    text-align:center;
+    margin:0;
+    padding:10px;
+}
+button{
+    padding:8px 14px;
+    margin:5px;
+    border:none;
+    border-radius:6px;
+    font-size:14px;
+    cursor:pointer;
+}
+#startBtn{background:#00ffc8;color:black;}
+#freezeBtn{background:#ffcc00;color:black;}
+#markBtn{background:#ff4d4d;color:black;}
+#fisicasBtn{background:#4d79ff;color:black;}
+#eliminarBtn{background:#ff4d4d;color:black;}
+.disableBtn{background:#666;color:white;}
+
+.cajas{
+    display:grid;
+    grid-template-columns:1fr 1fr 1fr;
+    gap:10px;
+    width:320px;
+    margin:auto;
+    margin-top:20px;
+}
+.caja{
+    background:#222;
+    padding:10px;
+    border-radius:8px;
+}
+.valor{font-size:16px;color:#00ffc8;margin-bottom:5px;}
+.invertBtn{padding:5px 10px;margin-top:5px;font-size:12px;background:#555;color:white;}
+.finalValor{font-size:14px;color:#ff6b6b;margin-top:5px;}
+
+#pantalla{
+    width:320px;
+    height:320px;
+    background:white;
+    margin:auto;
+    margin-top:20px;
+    position:relative;
+    border-radius:10px;
+    overflow:hidden;
+}
+
+#centro{
+    width:12px;
+    height:12px;
+    background:lime;
+    border-radius:50%;
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    z-index:2;
+}
+
+#puntoRojo{
+    width:6px;
+    height:6px;
+    background:black;
+    border-radius:50%;
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    z-index:3;
+}
+#puntoRojo::before, #puntoRojo::after{
+    content:"";
+    position:absolute;
+    background:black;
+}
+#puntoRojo::before{width:2px;height:50px; top:-25px; left:50%; transform:translateX(-50%);}
+#puntoRojo::after{height:2px;width:50px; left:-25px; top:50%; transform:translateY(-50%);}
+
+/* punto invertido */
+#puntoInvertido{
+    width:6px;
+    height:6px;
+    background:red;
+    border-radius:50%;
+    position:absolute;
+    left:50%;
+    top:50%;
+    transform:translate(-50%,-50%);
+    z-index:4;
+}
+
+/* capa para disparos */
+.disparo{
+    width:6px;
+    height:6px;
+    border-radius:50%;
+    position:absolute;
+    z-index:5;
+}
+
+label{margin-top:10px; display:block; color:white;}
+input[type="range"]{width:150px;}
+input[type="color"]{width:50px; height:30px; padding:0; border:none;}
+</style>
+</head>
+<body>
+
+<h2>Sniper Giroscopio con Físicas</h2>
+
+<!-- Botones principales -->
+<button id="startBtn">Start</button>
+<button id="freezeBtn">Freeze</button>
+<button id="markBtn">Marcar</button>
+<button id="fisicasBtn">Físicas</button>
+<button id="eliminarBtn">Eliminar</button>
+
+<label>
+Color del pizarrón:
+<input type="color" id="colorPicker" value="#ffffff">
+</label>
+
+<label>
+Color de los disparos:
+<input type="color" id="colorDisparos" value="#ffffff">
+</label>
+
+<label>
+Delay (pasos):
+<input type="range" id="delaySlider" min="0" max="50" value="0">
+<span id="delayValue">0</span>
+</label>
+
+<!-- Cajas de giroscopio -->
+<div class="cajas">
+    <div class="caja">
+        Alpha
+        <div id="alpha" class="valor">0</div>
+        <button id="invertAlpha" class="invertBtn">Invertir</button>
+        <div id="finalAlpha" class="finalValor">0</div>
+    </div>
+    <div class="caja">
+        Beta
+        <div id="beta" class="valor">0</div>
+        <button id="invertBeta" class="invertBtn">Invertir</button>
+        <div id="finalBeta" class="finalValor">0</div>
+    </div>
+    <div class="caja">
+        Gamma
+        <div id="gamma" class="valor">0</div>
+        <button id="invertGamma" class="invertBtn">Invertir</button>
+        <div id="finalGamma" class="finalValor">0</div>
+    </div>
+</div>
+
+<!-- Botones deshabilitar ejes -->
+<button class="disableBtn" id="disableX">Deshabilitar X</button>
+<button class="disableBtn" id="disableY">Deshabilitar Y</button>
+<button class="disableBtn" id="disableZ">Deshabilitar Z</button>
+
+<div id="pantalla">
+    <div id="centro"></div>
+    <div id="puntoRojo"></div>
+    <div id="puntoInvertido"></div>
+</div>
+
+<script>
+let punto = document.getElementById("puntoRojo");
+let puntoInv = document.getElementById("puntoInvertido");
+let pantalla = document.getElementById("pantalla");
+let activo=false;
+let baseBeta=0, baseGamma=0;
+let invertAlpha=false, invertBeta=false, invertGamma=false;
+let disableX=false, disableY=false, disableZ=false;
+let listaDisparos=[];
+let fisicas=false;
+
+let colorPicker = document.getElementById("colorPicker");
+let colorDisparosInput = document.getElementById("colorDisparos");
+let delaySlider = document.getElementById("delaySlider");
+let delayValue = document.getElementById("delayValue");
+let targetX=0, targetY=0;
+let currentX=0, currentY=0;
+
+colorPicker.addEventListener("input", ()=>pantalla.style.background = colorPicker.value);
+colorDisparosInput.addEventListener("input",(e)=>listaDisparos.forEach(d=>d.el.style.background=e.target.value));
+delaySlider.addEventListener("input", ()=>delayValue.innerText = delaySlider.value);
+
+// Botones principales
+document.getElementById("startBtn").addEventListener("click", ()=>{activo=true;baseBeta=0;baseGamma=0;});
+document.getElementById("freezeBtn").addEventListener("click", ()=>activo=false);
+
+// Invertir ejes
+document.getElementById("invertAlpha").addEventListener("click", ()=>{
+    invertAlpha=!invertAlpha;
+    document.getElementById("invertAlpha").style.background = invertAlpha?"#00ffc8":"#555";
+});
+document.getElementById("invertBeta").addEventListener("click", ()=>{
+    invertBeta=!invertBeta;
+    document.getElementById("invertBeta").style.background = invertBeta?"#00ffc8":"#555";
+});
+document.getElementById("invertGamma").addEventListener("click", ()=>{
+    invertGamma=!invertGamma;
+    document.getElementById("invertGamma").style.background = invertGamma?"#00ffc8":"#555";
+});
+
+// Botón físicas
+document.getElementById("fisicasBtn").addEventListener("click", ()=>{
+    fisicas = !fisicas;
+    document.getElementById("fisicasBtn").style.background = fisicas?"#66ff66":"#4d79ff";
+});
+
+// Botón eliminar
+document.getElementById("eliminarBtn").addEventListener("click", ()=>{
+    listaDisparos.forEach(d=>pantalla.removeChild(d.el));
+    listaDisparos=[];
+});
+
+// Botones deshabilitar ejes
+document.getElementById("disableX").addEventListener("click", ()=>{
+    disableX=!disableX;
+    document.getElementById("disableX").style.background = disableX?"#ffcc00":"#666";
+});
+document.getElementById("disableY").addEventListener("click", ()=>{
+    disableY=!disableY;
+    document.getElementById("disableY").style.background = disableY?"#ffcc00":"#666";
+});
+document.getElementById("disableZ").addEventListener("click", ()=>{
+    disableZ=!disableZ;
+    document.getElementById("disableZ").style.background = disableZ?"#ffcc00":"#666";
+});
+
+// Marcar disparo
+document.getElementById("markBtn").addEventListener("click", ()=>{
+    let rect = punto.getBoundingClientRect();
+    let cont = pantalla.getBoundingClientRect();
+    let x = rect.left + rect.width/2 - cont.left;
+    let y = rect.top + rect.height/2 - cont.top;
+    let disparo = document.createElement("div");
+    disparo.className="disparo";
+    disparo.style.left=(x-3)+"px";
+    disparo.style.top=(y-3)+"px";
+    disparo.style.background = colorDisparosInput.value;
+    pantalla.appendChild(disparo);
+    listaDisparos.push({el:disparo,x:x,y:y,vx:0,vy:0});
+});
+
+// Giroscopio
+window.addEventListener("deviceorientation", function(event){
+    let alpha = event.alpha||0;
+    let beta = event.beta||0;
+    let gamma = event.gamma||0;
+
+    document.getElementById("alpha").innerText = alpha.toFixed(2);
+    document.getElementById("beta").innerText = beta.toFixed(2);
+    document.getElementById("gamma").innerText = gamma.toFixed(2);
+
+    if(!activo) return;
+    if(baseBeta===0 && baseGamma===0){baseBeta=beta;baseGamma=gamma;}
+
+    let valAlpha = invertAlpha?-alpha:alpha;
+    let valBeta  = invertBeta?-beta:beta;
+    let valGamma = invertGamma?-gamma:gamma;
+
+    if(disableZ) valAlpha=0;
+    if(disableY) valBeta=0;
+    if(disableX) valGamma=0;
+
+    document.getElementById("finalAlpha").innerText = valAlpha.toFixed(2);
+    document.getElementById("finalBeta").innerText = valBeta.toFixed(2);
+    document.getElementById("finalGamma").innerText = valGamma.toFixed(2);
+
+    targetX = (valGamma - (invertGamma?-baseGamma:baseGamma))*3;
+    targetY = (valBeta - (invertBeta?-baseBeta:baseBeta))*3;
+
+    let steps = parseInt(delaySlider.value)||0;
+    if(steps>0){
+        currentX += (targetX - currentX)/steps;
+        currentY += (targetY - currentY)/steps;
+    } else {
+        currentX = targetX;
+        currentY = targetY;
+    }
+
+    punto.style.transform=`translate(${currentX}px,${currentY}px)`;
+    puntoInv.style.transform=`translate(${(invertGamma?-gamma:gamma - (invertGamma?-baseGamma:baseGamma))*3}px,${(invertBeta?-beta:beta - (invertBeta?-baseBeta:baseBeta))*3}px)`;
+});
+
+// Física / gravedad sobre disparos
+function actualizarFisicas(){
+    if(fisicas){
+        listaDisparos.forEach(p=>{
+            let g=0.5;
+            p.vy+=g;
+            p.x+=p.vx;
+            p.y+=p.vy;
+
+            // Limites del lienzo
+            if(p.y>pantalla.clientHeight-6){p.y=pantalla.clientHeight-6;p.vy*=-0.5;}
+            if(p.x>pantalla.clientWidth-6){p.x=pantalla.clientWidth-6;p.vx*=-0.5;}
+            if(p.x<0){p.x=0;p.vx*=-0.5;}
+            if(p.y<0){p.y=0;p.vy*=-0.5;}
+
+            p.el.style.left = p.x+"px";
+            p.el.style.top  = p.y+"px";
+        });
+    }
+    requestAnimationFrame(actualizarFisicas);
+}
+actualizarFisicas();
+</script>
+</body>
+</html>
